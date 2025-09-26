@@ -5,7 +5,7 @@
 
 typedef enum {
 	T_EOF, T_ID, T_NUM, T_STR, T_CHAR,
-	T_OP,
+	T_OP, T_KW,
 	T_PUNC,
 	T_UNKNOWN
 } tokentype;
@@ -218,37 +218,3 @@ int main(int argc, char **argv) {
 	free(buf);
 	return 0;
 }
-
-/*
-long filesize(const char* fn) {
-	FILE *psi = fopen(fn, "rb");
-	if (psi == NULL) {
-		perror("Error opening file\n");
-		return -1;
-	}
-	fseek(psi, 0, SEEK_END);
-	long size = ftell(psi);
-	fclose(psi);
-	return size;
-}
-
-int main() {
-	char fn[100];
-	scanf("%s", fn);
-
-	long length = filesize(fn);
-	if (length < 0) return 1;
-	
-	FILE *pre = fopen(fn, "r");
-	char line[length + 1];
-	while (fgets(line, sizeof(line), pre)) {
-		char *token = strtok(line, " \t\n");
-		while  (token) {
-			printf("%s\n", token);
-			token = strtok(NULL, " \t\n");
-		}
-	}
-	fclose(pre);
-	return 0;
-}
-*/
