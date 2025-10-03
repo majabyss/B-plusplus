@@ -1,39 +1,61 @@
+/*
+ * rw.c - Simple file copy utility for B++ project
+ * Copies the contents of one file to another.
+ * Usage: ./rw <output_file> <input_file>
+ */
 #include <stdio.h>
 #include <string.h>
 
+// Returns the size of the file in bytes, or -1 on error
 long filesize(const char* file) {
-	FILE *psi = fopen(file, "rb");
-	if (psi == NULL) {
-		perror("Error opening file.\n");
-		return -1;
-	}
-	fseek(psi, 0, SEEK_END);
-	long size = ftell(psi);
-	fclose(psi);
-	return size;
+    FILE *psi = fopen(file, "rb");
+    if (psi == NULL) {
+        perror("Error opening file");
+        return -1;
+    }
+    fseek(psi, 0, SEEK_END);
+    long size = ftell(psi);
+    fclose(psi);
+    return size;
 }
 
 int main(int argc, char *argv[]) {
-	char file[100];
-	strcpy(file, argv[2]);
+    // Check for correct number of arguments
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <output_file> <input_file>\n", argv[0]);
+        return 1;
+    }
 
-	long length = filesize(file);
-	if (length < 0) return 1;
+    const char *inputFile = argv[2];
+    const char *outputFile = argv[1];
 
-	FILE *pre = fopen(argv[2], "r");
-	if (!pre) {
-		perror("Error opening file.\n");
-		printf("%d", argc);
-		return 1;
-	}
-	FILE *pri = fopen(argv[1], "w");
+    // Get the size of the input file
+    long length = filesize(inputFile);
+    if (length < 0) return 1;
 
-	char _strings[length + 1];
-	while (fgets(_strings, sizeof(_strings), pre) != NULL) {
-		fprintf(pri, "%s", _strings);
-		}
+    // Open input file for reading
+    FILE *inFile = fopen(inputFile, "r");
+    if (!inFile) {
+        perror("Error opening input file");
+        return 1;
+    }
+    // Open output file for writing
+    FILE *outFile = fopen(outputFile, "w");
+    if (!outFile) {
+        perror("Error opening output file");
+        fclose(inFile);
+        return 1;
+    }
 
-	fclose(pre);
-	fclose(pri);
-	return 0;
+    // Buffer to hold file contents (line by line)
+    char buffer[length + 1];
+    // Copy contents from input to output
+    while (fgets(buffer, sizeof(buffer), inFile) != NULL) {
+        fprintf(outFile, "%s", buffer);
+    }
+
+    // Close files
+    fclose(inFile);
+    fclose(outFile);
+    return 0;
 }
