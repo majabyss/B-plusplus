@@ -367,6 +367,7 @@ static const char *translate_type(const token *t) {
 	if (token_id_matches(t, "f64")) return "double";
 	if (token_id_matches(t, "void")) return "void";
 	if (token_id_matches(t, "chr")) return "char";
+  if (token_id_matches(t, "memsize")) return "size_t";
 	return NULL; // Not a type
 }
 
@@ -374,7 +375,9 @@ static const char *translate_type(const token *t) {
 static int validate_identifier(parser *p, const token *t) {
 	// Check if it's a built-in function you want to allow
 	if (token_id_matches(t, "printf")) return 1;  // Allow printf
-	
+  if (token_id_matches(t, "malloc")) return 1;  // Allow malloc
+  if (token_id_matches(t, "free")) return 1;  //Allow free
+
 	// Check if it's in the symbol table
 	if (symbol_exists(p->symbols, t->start, t->len)) {
 		return 1;
