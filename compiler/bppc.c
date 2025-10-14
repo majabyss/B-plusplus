@@ -31,6 +31,9 @@ typedef struct {
 	size_t len;
 	size_t line, col;
 	KwKind kw; // If type == T_KW, which keyword
+  const char* ws_start;
+  size_t ws_len;
+  int leading_spaces;
 } token;
 
 // Lexer state
@@ -85,6 +88,15 @@ static void posup(lexer *pl) {
 		pl->col++;
 	}
 	pl->p++;
+}
+
+static void write_token_with_spacing(parser *p, const token *t) {
+    // Write preserved spaces
+    for (int i = 0; i < t->leading_spaces && i < 3; i++) {  // cap at 3 spaces
+        fprintf(p->out, " ");
+    }
+    // Write token
+    fwrite(t->start, 1, t->len, p->out);
 }
 
 // Skips whitespace and comments (// and /* ... */)
@@ -158,13 +170,76 @@ static KwKind lookup_keyword(const char *str, size_t len) {
 * Returns a token struct with type, position, and value info.
 */
 static token next_token(lexer *pl) {
-	skip_wscomms(pl);
+  // Count spaces (not newlines)
+    int spaces = 0;
+    const char *ws_start = pl->p;
+    
+    //First pass - whitespace counter
+    while (*pl->p == ' ' || *pl->p == '\t') {
+        if (*pl->p == ' ') spaces++;
+        else if (*pl->p == '\t') spaces += 4;
+        pl->p++;
+        pl->col++;
+    }
+    
+    // Skip newlines and comments
+    for (;;) {
+    //skip newlines
+    if (*pl->p == '\n') {
+      pl->line++;
+      pl->col = 1;
+      pl->p++;
+      spaces = 0; //Reset spaces after newline
+      
+      while (*pl->p == ' ' || *pl->p == '\t') {
+        if (*pl->p == ' ') spaces++;
+        else if (*pl->p == '\t') spaces += 4;
+        pl->p++;
+        pl->col++;
+      }
+      continue;
+    }
+    //Single-line comment
+    if (pl->p[0] == '/' && pl->p[1] == '/') {
+      while (*pl->p && *pl->p != '\n') {
+        pl->p++;
+        pl->col++;
+      }
+      continue;
+    }
+    //Multi-line comment
+    if (pl->p[0] == '/' && pl->p[1] == '*') {
+      pl->p += 2;
+      pl->col += 2;
+      while (*pl->p) {
+        if (pl->p[0] == '*' && pl->p[1] == '/') {
+          pl->p += 2;
+          pl->col += 2;
+          break;
+        }
+        posup(pl);
+      }
+      continue;
+    }
+    break;
+  }
 
-	token t = {.type = T_UNKNOWN, .start = pl->p, .len = 0, .line = pl->line, .col = pl->col, .kw = KW_NONE};
-	if(*pl->p == '\0') {
-		t.type = T_EOF;
-		return t;
-	}
+    token t = {
+        .type = T_UNKNOWN,
+        .start = pl->p,
+        .len = 0,
+        .line = pl->line,
+        .col = pl->col,
+        .kw = KW_NONE,
+        .leading_spaces = spaces,
+        .ws_start = ws_start,
+        .ws_len = (size_t)(pl->p - ws_start)
+    };
+
+    if (*pl->p == '\0') {
+    t.type = T_EOF;
+    return t;
+  }
 
 	// Identifier or keyword
 	if (is_ident_start((unsigned char)*pl->p)) {
@@ -368,7 +443,7 @@ static const char *translate_type(const token *t) {
 	if (token_id_matches(t, "void")) return "void";
 	if (token_id_matches(t, "chr")) return "char";
   if (token_id_matches(t, "memsize")) return "size_t";
-	return NULL; // Not a type
+  if (token_id_matches(t, "NULL")) return "NULL"; // Not a type
 }
 
 // Validate identifier - check if it's defined
@@ -456,43 +531,70 @@ static void parse_function(parser *p) {
 
 // Parse variable declaration
 static void parse_var_declaration(parser *p) {
-	token *var_type = current_token(p);
-	const char *c_type = translate_type(var_type);
-	if (c_type) {
-		fprintf(p->out, "    %s ", c_type);
-		advance(p);
-		
-		token *var_name = current_token(p);
-		if (var_name->type == T_ID) {
-			add_symbol(p->symbols, var_name->start, var_name->len);
-			write_token(p, var_name);
-			advance(p);
-		}
-		
-		// Handle initialization
-		if (current_token(p)->type == T_OP && current_token(p)->len == 1 && *current_token(p)->start == '=') {
-			fprintf(p->out, " = ");
-			advance(p);
-			
-			// Parse expression (validate identifiers)
-			while (current_token(p)->type != T_PUNC && current_token(p)->type != T_EOF) {
-				token *val = current_token(p);
-				if (val->type == T_ID) {
-					if (!validate_identifier(p, val)) {
-						advance(p);
-						continue;
-					}
-				}
-				write_token(p, val);
-				fprintf(p->out, " ");
-				advance(p);
-			}
-		}
-		
-		if (expect_punc(p, ";")) {
-			fprintf(p->out, ";\n");
-		}
-	}
+    token *var_type = current_token(p);
+    const char *c_type = translate_type(var_type);
+    if (!c_type) return;
+
+    // Emit base C type
+    fprintf(p->out, "    %s", c_type);
+    advance(p); // consume the type token
+
+    // Collect pointers WITH ORIGINAL SPACING
+    while (current_token(p)->type == T_OP && current_token(p)->len == 1 && *current_token(p)->start == '*') {
+        token *ptr_tok = current_token(p);
+
+        for (int i = 0; i < ptr_tok->leading_spaces && i < 2; i++) {
+            fprintf(p->out, " ");
+    }
+    fprintf(p->out, "*");
+        advance(p);
+  }
+
+     // Write variable name with its original spacing
+    token *var_name = current_token(p);
+    if (var_name->type == T_ID) {
+        // Preserve spacing before variable name
+        for (int i = 0; i < var_name->leading_spaces && i < 2; i++) {
+            fprintf(p->out, " ");
+        }
+        add_symbol(p->symbols, var_name->start, var_name->len);
+        write_token(p, var_name);
+        advance(p);
+    }
+
+    // Handle initialization (consume '=' and the expression)
+    if (current_token(p)->type == T_OP && current_token(p)->len == 1 && *current_token(p)->start == '=') {
+        fprintf(p->out, " = ");
+        advance(p); // consume '='
+
+        // Parse expression - need to handle parentheses!
+        int paren_depth = 0;
+        while ((current_token(p)->type != T_PUNC || paren_depth > 0) && 
+               current_token(p)->type != T_EOF) {
+            token *val = current_token(p);
+            
+            // Track parentheses depth
+            if (val->type == T_PUNC && val->len == 1) {
+                if (*val->start == '(') paren_depth++;
+                else if (*val->start == ')') paren_depth--;
+                else if (*val->start == ';' && paren_depth == 0) break;  // End of statement
+            }
+            
+            if (val->type == T_ID) {
+                if (!validate_identifier(p, val)) {
+                    advance(p);
+                    continue;
+                }
+            }
+            write_token(p, val);
+            advance(p);
+        }
+    }
+
+    // Consume trailing semicolon if present
+    if (expect_punc(p, ";")) {
+        fprintf(p->out, ";\n");
+    }
 }
 
 // Parse a generic statement
