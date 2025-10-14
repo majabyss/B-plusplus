@@ -1,0 +1,11 @@
+fun u8 main() {
+    memsize size = 100;
+    void *ptr = malloc(size);
+    if (ptr == NULL) {
+        printf("Memory allocation failed.\n");
+        return 1;
+      }
+    printf("Allocated %zu bytes using malloc.\n", size);
+    free(ptr);
+    return 0;
+    }
