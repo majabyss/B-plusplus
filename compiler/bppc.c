@@ -175,7 +175,7 @@ static token next_token(lexer *pl) {
     const char *ws_start = pl->p;
     
     //First pass - whitespace counter
-    while (*pl->p == ' ' || *pl->p == '\t') {
+    while (*pl->p == ' ' || *pl->p == '\t' || *pl->p == '\r') {
         if (*pl->p == ' ') spaces++;
         else if (*pl->p == '\t') spaces += 4;
         pl->p++;
@@ -185,12 +185,22 @@ static token next_token(lexer *pl) {
     // Skip newlines and comments
     for (;;) {
     //skip newlines
+    while (*pl->p == '\r') {
+      pl->p++;
+      pl->col++;
+      }
+
     if (*pl->p == '\n') {
       pl->line++;
       pl->col = 1;
       pl->p++;
       spaces = 0; //Reset spaces after newline
       
+      while (*pl->p == '\r') {
+            pl->p++;
+            pl->col++;
+      } 
+      			
       while (*pl->p == ' ' || *pl->p == '\t') {
         if (*pl->p == ' ') spaces++;
         else if (*pl->p == '\t') spaces += 4;
@@ -442,8 +452,13 @@ static const char *translate_type(const token *t) {
 	if (token_id_matches(t, "f64")) return "double";
 	if (token_id_matches(t, "void")) return "void";
 	if (token_id_matches(t, "chr")) return "char";
-  if (token_id_matches(t, "memsize")) return "size_t";
-  if (token_id_matches(t, "NULL")) return "NULL"; // Not a type
+ 	if (token_id_matches(t, "memsize")) return "size_t";
+  	if (token_id_matches(t, "NULL")) return "NULL"; // Not a type
+}
+
+// Memory safety Check
+static void address_checker() {
+
 }
 
 // Validate identifier - check if it's defined
