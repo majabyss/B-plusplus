@@ -1,8 +1,3 @@
-/*
-* token.c - Tokenizer (lexer) for B++ project
-* Reads source code and splits it into tokens: identifiers, keywords, numbers, strings, chars, operators, punctuation, etc.
-* Usage: ./token file.c
-*/
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
