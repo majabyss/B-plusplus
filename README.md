@@ -3,5 +3,4 @@ B++ is a low level language built with inspiration from languages such as C/C++,
 # We look forward to updating you about B++
 # The B++ Team
 - Wyatt Dempsey
-- Sam Mountain
 - Juan Herrera-Avila
